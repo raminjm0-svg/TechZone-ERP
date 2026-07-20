@@ -28,9 +28,12 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   });
 
   function onSubmit(data: LoginForm) {
-    // Dummy authentication
-    onLogin();
-    setLocation('/');
+    if (data.email === 'rami@techzone.com' && data.password === 'Rami2026') {
+      onLogin();
+      setLocation('/');
+    } else {
+      form.setError('email', { message: 'Invalid email or password' });
+    }
   }
 
   return (
@@ -57,7 +60,7 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="admin@techzone.com" {...field} data-testid="input-email" />
+                      <Input placeholder="Enter your email" {...field} data-testid="input-email" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -77,15 +80,15 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
                 )}
               />
               
-              <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground text-center">
-                Hint: Use <strong>admin@techzone.com</strong> / <strong>admin123</strong>
-              </div>
-
               <Button type="submit" className="w-full" size="lg" data-testid="btn-login">
                 Sign In
               </Button>
             </form>
           </Form>
+
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            Demo account: <span className="font-medium text-foreground">rami@techzone.com</span> / <span className="font-medium text-foreground">Rami2026</span>
+          </p>
         </CardContent>
       </Card>
     </div>
