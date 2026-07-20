@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "TechZone Electronics ERP"
+version = "1.0.0"
+id = "artifacts/techzone-erp"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23248
+
+[services.development]
+run = "pnpm --filter @workspace/techzone-erp run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/techzone-erp", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/techzone-erp/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23248"
+BASE_PATH = "/"
