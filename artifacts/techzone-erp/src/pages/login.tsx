@@ -86,9 +86,6 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
             </form>
           </Form>
 
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            Demo account: <span className="font-medium text-foreground">rami@techzone.com</span> / <span className="font-medium text-foreground">Rami2026</span>
-          </p>
         </CardContent>
       </Card>
     </div>
