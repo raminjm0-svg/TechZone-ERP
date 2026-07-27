@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, ShoppingCart } from 'lucide-react';
+import { Search, Plus, ShoppingCart, MoreHorizontal, Pencil, Trash2, FileText } from 'lucide-react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +15,9 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const newSaleSchema = z.object({
   customerName: z.string().min(2, "Customer name is required"),
@@ -31,13 +34,20 @@ type NewSaleForm = z.infer<typeof newSaleSchema>;
 export default function SalesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('orders');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [orders, setOrders] = useState([...salesOrders]);
+  const [editingOrder, setEditingOrder] = useState<typeof salesOrders[0] | null>(null);
+  const [deletingOrder, setDeletingOrder] = useState<typeof salesOrders[0] | null>(null);
   const { toast } = useToast();
 
-  const filteredOrders = salesOrders.filter(order => 
-    order.customer.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.products.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrders = orders
+    .filter(order => statusFilter === 'All' || order.status === statusFilter)
+    .filter(order => 
+      searchTerm === '' ||
+      order.customer.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.products.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   const form = useForm<NewSaleForm>({
     resolver: zodResolver(newSaleSchema),
@@ -61,14 +71,29 @@ export default function SalesPage() {
     setActiveTab('orders');
   };
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch(status) {
-      case 'Completed': return 'default';
-      case 'Processing': return 'secondary';
-      case 'Pending': return 'outline';
-      case 'Cancelled': return 'destructive';
-      default: return 'default';
+  const handleDelete = () => {
+    if (deletingOrder) {
+      setOrders(orders.filter(o => o.id !== deletingOrder.id));
+      toast({ title: "Order deleted", description: `Order ${deletingOrder.id} has been removed.` });
+      setDeletingOrder(null);
     }
+  };
+
+  const handleEditSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingOrder) {
+      setOrders(orders.map(o => o.id === editingOrder.id ? editingOrder : o));
+      toast({ title: "Order updated", description: `Order ${editingOrder.id} has been updated.` });
+      setEditingOrder(null);
+    }
+  };
+
+  const handleViewInvoice = (order: typeof salesOrders[0]) => {
+    toast({
+      title: "Invoice Ready",
+      description: `Invoice for ${order.id} — ${order.customer} — $${order.total}`,
+      action: <Button variant="outline" size="sm">Download</Button>
+    });
   };
 
   const getStatusBadgeStyle = (status: string) => {
@@ -104,7 +129,7 @@ export default function SalesPage() {
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.25 }}
           >
             <TabsContent value="orders" className="mt-0">
               <Card className="shadow-sm border-border rounded-2xl overflow-hidden">
@@ -124,6 +149,17 @@ export default function SalesPage() {
                       />
                     </div>
                   </div>
+                  <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+                    {['All', 'Completed', 'Processing', 'Pending', 'Cancelled'].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setStatusFilter(s)}
+                        className={`whitespace-nowrap px-3 py-1 rounded-full text-sm font-semibold transition-colors ${statusFilter === s ? 'bg-primary text-white' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
@@ -135,7 +171,8 @@ export default function SalesPage() {
                         <TableHead className="font-semibold text-muted-foreground py-4">Date</TableHead>
                         <TableHead className="font-semibold text-muted-foreground py-4">Payment</TableHead>
                         <TableHead className="font-semibold text-muted-foreground text-right py-4">Total</TableHead>
-                        <TableHead className="font-semibold text-muted-foreground text-right px-6 py-4">Status</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground text-right py-4">Status</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground text-right px-6 py-4">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -150,16 +187,41 @@ export default function SalesPage() {
                             <TableCell className="text-right font-bold text-foreground py-4">
                               ${order.total.toLocaleString(undefined, {minimumFractionDigits: 2})}
                             </TableCell>
-                            <TableCell className="text-right px-6 py-4">
+                            <TableCell className="text-right py-4">
                               <Badge className={`px-2.5 py-1 text-xs font-bold border ${getStatusBadgeStyle(order.status)}`}>
                                 {order.status}
                               </Badge>
+                            </TableCell>
+                            <TableCell className="text-right px-6 py-4">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0 rounded-lg">
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-[160px]">
+                                  <DropdownMenuItem onClick={() => handleViewInvoice(order)}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    View Invoice
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setEditingOrder(order)}>
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Edit Order
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => setDeletingOrder(order)} className="text-rose-600 focus:text-rose-600 focus:bg-rose-50">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={7} className="h-32 text-center text-muted-foreground font-medium">
+                          <TableCell colSpan={8} className="h-32 text-center text-muted-foreground font-medium">
                             No orders found matching your search.
                           </TableCell>
                         </TableRow>
@@ -313,6 +375,85 @@ export default function SalesPage() {
           </motion.div>
         </div>
       </Tabs>
+
+      {/* Edit Order Dialog */}
+      <Dialog open={!!editingOrder} onOpenChange={(open) => !open && setEditingOrder(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Order</DialogTitle>
+          </DialogHeader>
+          {editingOrder && (
+            <form onSubmit={handleEditSave} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <FormLabel className="font-semibold">Customer</FormLabel>
+                <Input 
+                  value={editingOrder.customer} 
+                  onChange={(e) => setEditingOrder({...editingOrder, customer: e.target.value})} 
+                  className="rounded-xl h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <FormLabel className="font-semibold">Products</FormLabel>
+                <Input 
+                  value={editingOrder.products} 
+                  onChange={(e) => setEditingOrder({...editingOrder, products: e.target.value})} 
+                  className="rounded-xl h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <FormLabel className="font-semibold">Payment Method</FormLabel>
+                <Select value={editingOrder.payment} onValueChange={(v) => setEditingOrder({...editingOrder, payment: v})}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Credit Card">Credit Card</SelectItem>
+                    <SelectItem value="Debit Card">Debit Card</SelectItem>
+                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <FormLabel className="font-semibold">Status</FormLabel>
+                <Select value={editingOrder.status} onValueChange={(v) => setEditingOrder({...editingOrder, status: v})}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                    <SelectItem value="Processing">Processing</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="Cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="outline" className="rounded-xl" onClick={() => setEditingOrder(null)}>Cancel</Button>
+                <Button type="submit" className="rounded-xl">Save Changes</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Alert */}
+      <AlertDialog open={!!deletingOrder} onOpenChange={(open) => !open && setDeletingOrder(null)}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete order {deletingOrder?.id}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

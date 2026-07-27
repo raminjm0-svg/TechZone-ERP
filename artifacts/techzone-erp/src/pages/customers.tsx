@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Search, UserPlus, HeartHandshake, Headphones } from 'lucide-react';
+import { Search, UserPlus, HeartHandshake, Headphones, History } from 'lucide-react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
-import { customersList, supportTickets } from '@/data/dummyData';
+import { customersList, supportTickets, warrantyRecords, returnRequests } from '@/data/dummyData';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 const customerSchema = z.object({
   firstName: z.string().min(2, "First name is required"),
@@ -32,6 +33,8 @@ type CustomerForm = z.infer<typeof customerSchema>;
 export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('customers');
+  const [returnsFilter, setReturnsFilter] = useState('All');
+  const [historyCustomer, setHistoryCustomer] = useState<typeof customersList[0] | null>(null);
   const { toast } = useToast();
 
   const filteredCustomers = customersList.filter(c => 
@@ -39,6 +42,8 @@ export default function CustomersPage() {
     c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const filteredReturns = returnRequests.filter(r => returnsFilter === 'All' || r.status === returnsFilter);
 
   const form = useForm<CustomerForm>({
     resolver: zodResolver(customerSchema),
@@ -81,6 +86,10 @@ export default function CustomersPage() {
     }
   };
 
+  const customerHistoryTickets = historyCustomer 
+    ? supportTickets.filter(t => t.customer === historyCustomer.name)
+    : [];
+
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-4">
@@ -89,14 +98,16 @@ export default function CustomersPage() {
         </div>
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Customer Service</h1>
-          <p className="text-sm font-medium text-muted-foreground mt-1">Manage client relationships and support tickets.</p>
+          <p className="text-sm font-medium text-muted-foreground mt-1">Manage client relationships, warranties, and support.</p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-3 p-1 bg-secondary rounded-xl">
+        <TabsList className="grid w-full max-w-4xl grid-cols-5 p-1 bg-secondary rounded-xl overflow-x-auto">
           <TabsTrigger value="customers" className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">Customers</TabsTrigger>
           <TabsTrigger value="tickets" className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">Support Tickets</TabsTrigger>
+          <TabsTrigger value="warranty" className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">Warranty</TabsTrigger>
+          <TabsTrigger value="returns" className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">Returns</TabsTrigger>
           <TabsTrigger value="add" className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">Add Customer</TabsTrigger>
         </TabsList>
         
@@ -105,7 +116,7 @@ export default function CustomersPage() {
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.25 }}
           >
             <TabsContent value="customers" className="mt-0">
               <Card className="shadow-sm border-border rounded-2xl overflow-hidden">
@@ -134,8 +145,8 @@ export default function CustomersPage() {
                         <TableHead className="font-semibold text-muted-foreground py-4">Contact</TableHead>
                         <TableHead className="font-semibold text-muted-foreground text-center py-4">Orders</TableHead>
                         <TableHead className="font-semibold text-muted-foreground text-right py-4">Lifetime Value</TableHead>
-                        <TableHead className="font-semibold text-muted-foreground py-4">Member Since</TableHead>
-                        <TableHead className="font-semibold text-muted-foreground text-right px-6 py-4">Status</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4 text-center">Status</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground text-right px-6 py-4">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -151,7 +162,7 @@ export default function CustomersPage() {
                                   </Avatar>
                                   <div>
                                     <div className="font-bold text-foreground">{cus.name}</div>
-                                    <div className="text-xs font-medium text-muted-foreground">{cus.id}</div>
+                                    <div className="text-xs font-medium text-muted-foreground">{cus.id} • {cus.memberSince}</div>
                                   </div>
                                 </div>
                               </TableCell>
@@ -163,8 +174,7 @@ export default function CustomersPage() {
                               <TableCell className="text-right font-bold text-foreground py-4">
                                 ${cus.totalSpent.toLocaleString(undefined, {minimumFractionDigits: 0})}
                               </TableCell>
-                              <TableCell className="text-muted-foreground font-medium py-4">{cus.memberSince}</TableCell>
-                              <TableCell className="text-right px-6 py-4">
+                              <TableCell className="text-center py-4">
                                 <Badge className={`px-2.5 py-1 text-xs font-bold border ${
                                   cus.status === 'VIP' ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100' : 
                                   cus.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 
@@ -173,6 +183,12 @@ export default function CustomersPage() {
                                   {cus.status === 'VIP' && <HeartHandshake className="w-3 h-3 mr-1.5" />}
                                   {cus.status}
                                 </Badge>
+                              </TableCell>
+                              <TableCell className="text-right px-6 py-4">
+                                <Button variant="outline" size="sm" className="rounded-lg font-semibold h-8" onClick={() => setHistoryCustomer(cus)}>
+                                  <History className="w-4 h-4 mr-2" />
+                                  History
+                                </Button>
                               </TableCell>
                             </TableRow>
                           );
@@ -233,6 +249,136 @@ export default function CustomersPage() {
                           <TableCell className="text-right px-6 py-4">
                             <Badge className={`px-2.5 py-1 text-xs font-bold border ${getStatusBadgeStyle(tkt.status)}`}>
                               {tkt.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="warranty" className="mt-0">
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <Card className="rounded-xl shadow-sm"><CardContent className="p-4 flex flex-col justify-center items-center"><p className="text-sm text-muted-foreground font-semibold">Total Records</p><p className="text-2xl font-bold">{warrantyRecords.length}</p></CardContent></Card>
+                <Card className="rounded-xl shadow-sm"><CardContent className="p-4 flex flex-col justify-center items-center"><p className="text-sm text-emerald-600 font-semibold">Active</p><p className="text-2xl font-bold">{warrantyRecords.filter(w => w.status === 'Active').length}</p></CardContent></Card>
+                <Card className="rounded-xl shadow-sm"><CardContent className="p-4 flex flex-col justify-center items-center"><p className="text-sm text-amber-600 font-semibold">Expiring Soon</p><p className="text-2xl font-bold">{warrantyRecords.filter(w => w.status === 'Expiring').length}</p></CardContent></Card>
+              </div>
+
+              <Card className="shadow-sm border-border rounded-2xl overflow-hidden">
+                <CardHeader className="pb-4 bg-card">
+                  <CardTitle className="text-xl">Warranty Registry</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-secondary/30">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="font-semibold text-muted-foreground px-6 py-4">Warranty ID</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Customer & Product</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Serial No</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Purchase Date</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Expiry Date</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Coverage</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground text-right px-6 py-4">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {warrantyRecords.map(w => (
+                        <TableRow key={w.id} className="group hover:bg-secondary/20 transition-colors">
+                          <TableCell className="px-6 py-4 font-medium text-xs text-muted-foreground">{w.id}</TableCell>
+                          <TableCell className="py-4">
+                            <div className="font-bold text-foreground">{w.product}</div>
+                            <div className="text-xs text-muted-foreground font-medium mt-0.5">{w.customerName}</div>
+                          </TableCell>
+                          <TableCell className="py-4 font-medium text-foreground text-sm">{w.serial}</TableCell>
+                          <TableCell className="py-4 font-medium text-muted-foreground">{w.purchaseDate}</TableCell>
+                          <TableCell className="py-4 font-bold text-foreground">{w.expiryDate}</TableCell>
+                          <TableCell className="py-4">
+                            <Badge variant="outline" className={`px-2 py-0.5 text-xs font-semibold ${w.coverage === 'Extended' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-secondary text-muted-foreground border-border'}`}>
+                              {w.coverage}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right px-6 py-4">
+                            <Badge className={`px-2.5 py-1 text-xs font-bold border ${
+                              w.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                              w.status === 'Expiring' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                              'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}>
+                              {w.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="returns" className="mt-0">
+              <Card className="shadow-sm border-border rounded-2xl overflow-hidden">
+                <CardHeader className="pb-6 border-b border-border bg-card">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-xl">Return Requests (RMA)</CardTitle>
+                      <CardDescription className="font-medium mt-1">Manage product returns and refunds</CardDescription>
+                    </div>
+                    <div className="flex gap-2 p-1 bg-secondary rounded-lg">
+                      {['All', 'Pending', 'Approved', 'Rejected', 'Completed'].map(f => (
+                        <button
+                          key={f}
+                          className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${returnsFilter === f ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                          onClick={() => setReturnsFilter(f)}
+                        >
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-secondary/30">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="font-semibold text-muted-foreground px-6 py-4">RMA Ref</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Customer</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Product</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Reason</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Date</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground text-right py-4">Refund</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground text-right px-6 py-4">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredReturns.map(r => (
+                        <TableRow key={r.id} className="group hover:bg-secondary/20 transition-colors">
+                          <TableCell className="px-6 py-4 font-medium text-xs text-muted-foreground">
+                            {r.id}<br/>
+                            <span className="text-[10px]">{r.orderId}</span>
+                          </TableCell>
+                          <TableCell className="py-4 font-bold text-foreground">{r.customerName}</TableCell>
+                          <TableCell className="py-4 font-medium text-muted-foreground max-w-[150px] truncate" title={r.product}>{r.product}</TableCell>
+                          <TableCell className="py-4">
+                            <Badge variant="outline" className={`px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider ${
+                              r.reason === 'Defective' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                              r.reason === 'Wrong Item' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                              r.reason === 'Not as Described' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                              'bg-secondary text-muted-foreground border-border'
+                            }`}>
+                              {r.reason}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-4 font-medium text-muted-foreground">{r.requestDate}</TableCell>
+                          <TableCell className="py-4 text-right font-bold">${r.refundAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                          <TableCell className="text-right px-6 py-4">
+                            <Badge className={`px-2.5 py-1 text-xs font-bold border ${
+                              r.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                              r.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                              r.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                              'bg-secondary text-muted-foreground border-border'
+                            }`}>
+                              {r.status}
                             </Badge>
                           </TableCell>
                         </TableRow>
@@ -376,6 +522,64 @@ export default function CustomersPage() {
           </motion.div>
         </div>
       </Tabs>
+
+      {/* Customer History Dialog */}
+      <Dialog open={!!historyCustomer} onOpenChange={(open) => !open && setHistoryCustomer(null)}>
+        <DialogContent className="sm:max-w-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Customer History</DialogTitle>
+          </DialogHeader>
+          {historyCustomer && (
+            <div className="space-y-6 py-2">
+              <div className="flex items-center gap-4 border-b border-border pb-4">
+                <Avatar className="h-16 w-16 border-2 border-primary/10">
+                  <AvatarFallback className="bg-primary/5 text-primary text-xl font-bold">{historyCustomer.name.split(' ').map(n => n[0]).join('').substring(0,2)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="text-xl font-bold text-foreground">{historyCustomer.name}</h3>
+                  <p className="text-sm font-medium text-muted-foreground">{historyCustomer.email} • {historyCustomer.phone}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-secondary/50 rounded-xl p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Total Orders</p>
+                  <p className="text-2xl font-bold">{historyCustomer.totalOrders}</p>
+                </div>
+                <div className="bg-secondary/50 rounded-xl p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Total Spent</p>
+                  <p className="text-2xl font-bold">${historyCustomer.totalSpent.toLocaleString()}</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold mb-3">Support Ticket History</h4>
+                {customerHistoryTickets.length > 0 ? (
+                  <div className="space-y-3">
+                    {customerHistoryTickets.map(t => (
+                      <div key={t.id} className="flex items-center justify-between p-3 border border-border rounded-xl">
+                        <div>
+                          <p className="font-bold text-sm">{t.subject}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{t.id} • {t.created} • {t.issueType}</p>
+                        </div>
+                        <Badge className={`px-2 py-0.5 text-[10px] font-bold border ${getStatusBadgeStyle(t.status)}`}>
+                          {t.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No support tickets found for this customer.</p>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setHistoryCustomer(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

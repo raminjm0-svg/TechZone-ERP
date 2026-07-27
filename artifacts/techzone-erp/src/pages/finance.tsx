@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DollarSign, ArrowUpRight, ArrowDownRight, Briefcase } from 'lucide-react';
+import { DollarSign, ArrowUpRight, ArrowDownRight, Briefcase, TrendingUp, Search } from 'lucide-react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,6 +16,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { StatCard } from '@/components/StatCard';
+import { Progress } from '@/components/ui/progress';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
 
 const transactionSchema = z.object({
   type: z.string().min(1, "Type is required"),
@@ -30,14 +32,36 @@ const transactionSchema = z.object({
 
 type TransactionForm = z.infer<typeof transactionSchema>;
 
+const monthlyData = [
+  { month: 'Jan', income: 210000, expenses: 140000 },
+  { month: 'Feb', income: 195000, expenses: 128000 },
+  { month: 'Mar', income: 230000, expenses: 155000 },
+  { month: 'Apr', income: 248000, expenses: 162000 },
+  { month: 'May', income: 265000, expenses: 170000 },
+  { month: 'Jun', income: 305000, expenses: 188000 },
+];
+
+const budgetData = [
+  { name: 'Salaries', budget: 150000, actual: 145000 },
+  { name: 'Rent', budget: 20000, actual: 20000 },
+  { name: 'Supplier Payments', budget: 100000, actual: 115000 },
+  { name: 'Utilities', budget: 5000, actual: 4800 },
+];
+
 export default function FinancePage() {
   const [filter, setFilter] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('transactions');
   const { toast } = useToast();
 
-  const filteredTransactions = financeData.transactions.filter(t => 
-    filter === 'All' ? true : t.type === filter
-  );
+  const filteredTransactions = financeData.transactions
+    .filter(t => filter === 'All' ? true : t.type === filter)
+    .filter(t => 
+      searchTerm === '' ||
+      t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.category.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   const form = useForm<TransactionForm>({
     resolver: zodResolver(transactionSchema),
@@ -65,6 +89,8 @@ export default function FinancePage() {
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
 
+  const profitMargin = ((financeData.summary.netProfit / financeData.summary.totalIncome) * 100).toFixed(1);
+
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-4">
@@ -77,7 +103,7 @@ export default function FinancePage() {
         </div>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Income"
           value={formatCurrency(financeData.summary.totalIncome)}
@@ -96,7 +122,52 @@ export default function FinancePage() {
           icon={<Briefcase className="w-5 h-5" />}
           accent="blue"
         />
+        <StatCard
+          title="Profit Margin"
+          value={`${profitMargin}%`}
+          icon={<TrendingUp className="w-5 h-5" />}
+          accent="violet"
+        />
       </div>
+
+      <Card className="shadow-sm border-border rounded-2xl overflow-hidden">
+        <CardHeader className="pb-6 border-b border-border bg-card">
+          <CardTitle className="text-xl">Monthly Overview</CardTitle>
+          <CardDescription className="font-medium mt-1">Income vs Expenses over the last 6 months</CardDescription>
+        </CardHeader>
+        <CardContent className="p-6 h-[320px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={monthlyData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `$${val / 1000}k`} tick={{ fill: '#64748b', fontSize: 12 }} />
+              <Tooltip 
+                cursor={{ fill: 'transparent' }}
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const inc = payload.find(p => p.dataKey === 'income')?.value as number;
+                    const exp = payload.find(p => p.dataKey === 'expenses')?.value as number;
+                    return (
+                      <div className="bg-white p-4 border border-border rounded-xl shadow-lg">
+                        <p className="font-bold text-sm mb-2">{label}</p>
+                        <div className="space-y-1">
+                          <p className="text-sm"><span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span>Income: <span className="font-medium">${inc.toLocaleString()}</span></p>
+                          <p className="text-sm"><span className="inline-block w-3 h-3 rounded-full bg-rose-500 mr-2"></span>Expenses: <span className="font-medium">${exp.toLocaleString()}</span></p>
+                          <p className="text-sm border-t border-border mt-2 pt-2"><span className="inline-block w-3 h-3 rounded-full bg-emerald-500 mr-2"></span>Profit: <span className="font-bold text-emerald-600">${(inc - exp).toLocaleString()}</span></p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+              <Bar dataKey="income" name="Income" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="expenses" name="Expenses" fill="#F43F5E" radius={[4, 4, 0, 0]} maxBarSize={40} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2 p-1 bg-secondary rounded-xl">
@@ -109,9 +180,37 @@ export default function FinancePage() {
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.25 }}
           >
-            <TabsContent value="transactions" className="mt-0">
+            <TabsContent value="transactions" className="mt-0 space-y-6">
+              
+              {/* Budget vs Actual Card */}
+              <Card className="shadow-sm border-border rounded-2xl overflow-hidden mb-6">
+                <CardHeader className="pb-4 bg-card">
+                  <CardTitle className="text-lg">Budget vs Actual</CardTitle>
+                </CardHeader>
+                <CardContent className="px-6 pb-6">
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    {budgetData.map(item => {
+                      const pct = Math.min((item.actual / item.budget) * 100, 100);
+                      const isOver = item.actual > item.budget;
+                      return (
+                        <div key={item.name}>
+                          <div className="flex justify-between text-sm mb-2">
+                            <span className="font-bold text-foreground">{item.name}</span>
+                            <span className="font-medium text-muted-foreground">${item.actual.toLocaleString()} / ${item.budget.toLocaleString()}</span>
+                          </div>
+                          <Progress 
+                            value={pct} 
+                            className={`h-2 bg-secondary ${isOver ? '[&>div]:bg-rose-500' : pct > 80 ? '[&>div]:bg-amber-500' : '[&>div]:bg-blue-500'}`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card className="shadow-sm border-border rounded-2xl overflow-hidden">
                 <CardHeader className="pb-6 border-b border-border bg-card">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -119,16 +218,27 @@ export default function FinancePage() {
                       <CardTitle className="text-xl">Ledger</CardTitle>
                       <CardDescription className="font-medium mt-1">Recent financial activities</CardDescription>
                     </div>
-                    <div className="flex gap-2 p-1 bg-secondary rounded-lg">
-                      {['All', 'Income', 'Expense'].map(f => (
-                        <button
-                          key={f}
-                          className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${filter === f ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                          onClick={() => setFilter(f)}
-                        >
-                          {f}
-                        </button>
-                      ))}
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                          placeholder="Search..." 
+                          className="pl-10 h-10 rounded-xl bg-secondary/50 border-transparent focus:bg-white focus:border-primary transition-colors"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex gap-1 p-1 bg-secondary rounded-lg">
+                        {['All', 'Income', 'Expense'].map(f => (
+                          <button
+                            key={f}
+                            className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all ${filter === f ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            onClick={() => setFilter(f)}
+                          >
+                            {f}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </CardHeader>

@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Search, UserPlus, Users } from 'lucide-react';
+import { Search, UserPlus, Users, Check, X } from 'lucide-react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
-import { employeesList } from '@/data/dummyData';
+import { employeesList, attendanceRecords, leaveRequests } from '@/data/dummyData';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +35,7 @@ type EmployeeForm = z.infer<typeof employeeSchema>;
 export default function HrPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('employees');
+  const [leaveFilter, setLeaveFilter] = useState('All');
   const { toast } = useToast();
 
   const filteredEmployees = employeesList.filter(e => 
@@ -42,6 +43,8 @@ export default function HrPage() {
     e.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.position.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const filteredLeaves = leaveRequests.filter(l => leaveFilter === 'All' || l.status === leaveFilter);
 
   const form = useForm<EmployeeForm>({
     resolver: zodResolver(employeeSchema),
@@ -68,6 +71,16 @@ export default function HrPage() {
     setActiveTab('employees');
   };
 
+  const handleLeaveAction = (id: string, action: 'Approve' | 'Reject') => {
+    toast({
+      title: `Request ${action}d`,
+      description: `Leave request ${id} has been ${action.toLowerCase()}d.`
+    });
+  };
+
+  const formatCurrency = (val: number) => 
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
+
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-4">
@@ -76,14 +89,16 @@ export default function HrPage() {
         </div>
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Human Resources</h1>
-          <p className="text-sm font-medium text-muted-foreground mt-1">Manage personnel, departments, and payroll.</p>
+          <p className="text-sm font-medium text-muted-foreground mt-1">Manage personnel, attendance, and leaves.</p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2 p-1 bg-secondary rounded-xl">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4 p-1 bg-secondary rounded-xl overflow-x-auto">
           <TabsTrigger value="employees" className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">Directory</TabsTrigger>
-          <TabsTrigger value="add" className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">Onboard Staff</TabsTrigger>
+          <TabsTrigger value="attendance" className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">Attendance</TabsTrigger>
+          <TabsTrigger value="leaves" className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">Leaves</TabsTrigger>
+          <TabsTrigger value="add" className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">Onboard</TabsTrigger>
         </TabsList>
         
         <div className="mt-8">
@@ -91,11 +106,10 @@ export default function HrPage() {
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.25 }}
           >
             <TabsContent value="employees" className="mt-0">
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6">
-                {/* We use a grid layout instead of a table to make it feel more premium like an actual directory */}
                 <div className="col-span-full mb-2">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
@@ -137,13 +151,21 @@ export default function HrPage() {
                             </Badge>
 
                             <div className="w-full mt-6 pt-6 border-t border-border space-y-3 text-left">
-                              <div>
+                              <div className="flex justify-between">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Joined</p>
+                                <p className="text-sm font-medium text-foreground">{emp.hireDate}</p>
+                              </div>
+                              <div className="flex justify-between">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Salary</p>
+                                <p className="text-sm font-bold text-foreground">{formatCurrency(emp.salary)}</p>
+                              </div>
+                              <div className="flex justify-between">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Phone</p>
+                                <p className="text-sm font-medium text-foreground">{emp.phone}</p>
+                              </div>
+                              <div className="flex flex-col">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Email</p>
                                 <p className="text-sm font-medium text-foreground truncate" title={emp.email}>{emp.email}</p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Phone</p>
-                                <p className="text-sm font-medium text-foreground">{emp.phone}</p>
                               </div>
                             </div>
                           </div>
@@ -159,6 +181,140 @@ export default function HrPage() {
               </div>
             </TabsContent>
             
+            <TabsContent value="attendance" className="mt-0">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <Card className="rounded-xl shadow-sm"><CardContent className="p-4 flex flex-col justify-center items-center"><p className="text-sm text-muted-foreground font-semibold">Total Records</p><p className="text-2xl font-bold">{attendanceRecords.length}</p></CardContent></Card>
+                <Card className="rounded-xl shadow-sm"><CardContent className="p-4 flex flex-col justify-center items-center"><p className="text-sm text-emerald-600 font-semibold">Present</p><p className="text-2xl font-bold">{attendanceRecords.filter(a => a.status === 'Present').length}</p></CardContent></Card>
+                <Card className="rounded-xl shadow-sm"><CardContent className="p-4 flex flex-col justify-center items-center"><p className="text-sm text-amber-600 font-semibold">Late</p><p className="text-2xl font-bold">{attendanceRecords.filter(a => a.status === 'Late').length}</p></CardContent></Card>
+                <Card className="rounded-xl shadow-sm"><CardContent className="p-4 flex flex-col justify-center items-center"><p className="text-sm text-rose-600 font-semibold">Absent</p><p className="text-2xl font-bold">{attendanceRecords.filter(a => a.status === 'Absent').length}</p></CardContent></Card>
+              </div>
+
+              <Card className="shadow-sm border-border rounded-2xl overflow-hidden">
+                <CardHeader className="pb-4 bg-card">
+                  <CardTitle className="text-xl">Daily Attendance</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-secondary/30">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="font-semibold text-muted-foreground px-6 py-4">Employee</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Date</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Check In</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Check Out</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4 text-center">Hours</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground text-right px-6 py-4">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {attendanceRecords.map(rec => (
+                        <TableRow key={rec.id} className="group hover:bg-secondary/20 transition-colors">
+                          <TableCell className="px-6 py-4 font-bold text-foreground">{rec.employeeName}</TableCell>
+                          <TableCell className="py-4 font-medium text-muted-foreground">{rec.date}</TableCell>
+                          <TableCell className="py-4 font-medium text-foreground">{rec.checkIn}</TableCell>
+                          <TableCell className="py-4 font-medium text-foreground">{rec.checkOut}</TableCell>
+                          <TableCell className="py-4 font-bold text-center">{rec.hoursWorked}</TableCell>
+                          <TableCell className="text-right px-6 py-4">
+                            <Badge className={`px-2.5 py-1 text-xs font-bold border ${
+                              rec.status === 'Present' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                              rec.status === 'Late' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                              rec.status === 'Absent' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                              'bg-blue-50 text-blue-700 border-blue-200'
+                            }`}>
+                              {rec.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="leaves" className="mt-0">
+              <Card className="shadow-sm border-border rounded-2xl overflow-hidden">
+                <CardHeader className="pb-6 border-b border-border bg-card">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-xl">Leave Requests</CardTitle>
+                      <CardDescription className="font-medium mt-1">Manage time off requests</CardDescription>
+                    </div>
+                    <div className="flex gap-2 p-1 bg-secondary rounded-lg">
+                      {['All', 'Pending', 'Approved', 'Rejected'].map(f => (
+                        <button
+                          key={f}
+                          className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${leaveFilter === f ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                          onClick={() => setLeaveFilter(f)}
+                        >
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-secondary/30">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="font-semibold text-muted-foreground px-6 py-4">Employee</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Department</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Leave Type</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Dates</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Days</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground py-4">Reason</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground text-center py-4">Status</TableHead>
+                        <TableHead className="font-semibold text-muted-foreground text-right px-6 py-4">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredLeaves.map(lr => (
+                        <TableRow key={lr.id} className="group hover:bg-secondary/20 transition-colors">
+                          <TableCell className="px-6 py-4 font-bold text-foreground">{lr.employeeName}</TableCell>
+                          <TableCell className="py-4 font-medium text-muted-foreground">{lr.department}</TableCell>
+                          <TableCell className="py-4">
+                            <Badge variant="outline" className={`px-2 py-0.5 text-xs font-semibold ${
+                              lr.leaveType === 'Annual' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                              lr.leaveType === 'Sick' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                              lr.leaveType === 'Emergency' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                              'bg-secondary text-muted-foreground border-border'
+                            }`}>
+                              {lr.leaveType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                            {lr.startDate} - {lr.endDate}
+                          </TableCell>
+                          <TableCell className="py-4 font-bold text-center">{lr.days}</TableCell>
+                          <TableCell className="py-4 font-medium text-muted-foreground max-w-[150px] truncate" title={lr.reason}>{lr.reason}</TableCell>
+                          <TableCell className="py-4 text-center">
+                            <Badge className={`px-2.5 py-1 text-xs font-bold border ${
+                              lr.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                              lr.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                              'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}>
+                              {lr.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right px-6 py-4">
+                            {lr.status === 'Pending' ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <Button size="icon" variant="outline" className="w-7 h-7 rounded-lg border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" onClick={() => handleLeaveAction(lr.id, 'Approve')} title="Approve">
+                                  <Check className="w-4 h-4" />
+                                </Button>
+                                <Button size="icon" variant="outline" className="w-7 h-7 rounded-lg border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => handleLeaveAction(lr.id, 'Reject')} title="Reject">
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ) : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             <TabsContent value="add" className="mt-0">
               <Card className="shadow-sm border-border rounded-2xl max-w-3xl mx-auto overflow-hidden">
                 <CardHeader className="pb-6 border-b border-border bg-card">
