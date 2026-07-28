@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Plus, AlertCircle, Package, Smartphone, Laptop, Tv, Headphones, Tablet, Plug, Gamepad2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Search, Plus, CircleAlert as AlertCircle, Package, Smartphone, Laptop, Tv, Headphones, Tablet, Plug, Gamepad2, MoveHorizontal as MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -297,10 +297,10 @@ export default function InventoryPage() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-[160px]">
-                                  <DropdownMenuItem onClick={() =>
-                                    updateProduct(product.id, { stock: product.stock + 10 }) &&
-                                    toast({ title: 'Stock Updated', description: `Added 10 units to ${product.name}.` })
-                                  }>
+                                  <DropdownMenuItem onClick={() => {
+                                    updateProduct(product.id, { stock: product.stock + 10 });
+                                    toast({ title: 'Stock Updated', description: `Added 10 units to ${product.name}.` });
+                                  }}>
                                     <Plus className="mr-2 h-4 w-4" />
                                     Restock (+10)
                                   </DropdownMenuItem>
