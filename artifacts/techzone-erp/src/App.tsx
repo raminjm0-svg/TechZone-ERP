@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { ERPProvider } from '@/context/ERPContext';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { Layout } from '@/components/Layout';
@@ -60,19 +61,21 @@ function Router({
 }
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router 
-            isLoggedIn={isLoggedIn} 
-            onLogin={() => setIsLoggedIn(true)}
-            onLogout={() => setIsLoggedIn(false)}
-          />
-        </WouterRouter>
-        <Toaster />
+        <ERPProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+            <Router
+              isLoggedIn={isLoggedIn}
+              onLogin={() => setIsLoggedIn(true)}
+              onLogout={() => setIsLoggedIn(false)}
+            />
+          </WouterRouter>
+          <Toaster />
+        </ERPProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
